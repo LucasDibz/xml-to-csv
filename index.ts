@@ -6,38 +6,59 @@ import { writeCsv } from './csvWriter';
 const parser = new Parser();
 
 function parseXml(filename: string) {
-  let parsed;
+  const array = [];
   const data = fs.readFileSync(`${__dirname}/xml/${filename}`, 'latin1');
 
   parser.parseString(data, (err, result) => {
-    const dataEmissao = result.nfe.NotaFiscal[0].NfeCabecario[0].dataEmissao[0];
-    const numeroNota = result.nfe.NotaFiscal[0].NfeCabecario[0].numeroNota[0];
-    const prestador = result.nfe.NotaFiscal[0].DadosPrestador[0].razaoSocial[0];
-    const tomador = result.nfe.NotaFiscal[0].TomadorServico[0].razaoSocial[0];
-    const valorServico =
-      result.nfe.NotaFiscal[0].DetalhesServico[0].valorServico[0];
-    const aliquota = result.nfe.NotaFiscal[0].DetalhesServico[0].aliquota[0];
-    const baseCalculo = result.nfe.NotaFiscal[0].Totais[0].baseCalculo[0];
-    const valorIss = result.nfe.NotaFiscal[0].Totais[0].valorIss[0];
-    const valorLiquidoNota =
-      result.nfe.NotaFiscal[0].Totais[0].valorLiquidoNota[0];
-    const descricao = result.nfe.NotaFiscal[0].DetalhesServico[0].descricao[0];
+    const notaFiscal = result?.nfe?.NotaFiscal;
 
-    parsed = {
-      dataEmissao,
-      numeroNota,
-      prestador,
-      tomador,
-      valorServico,
-      aliquota,
-      baseCalculo,
-      valorIss,
-      valorLiquidoNota,
-      descricao: descricao.replace(/,|;/g, ''),
-    };
+    if (notaFiscal) {
+      notaFiscal.forEach((nota) => {
+        let parsed;
+
+        const dataEmissao = nota.NfeCabecario[0].dataEmissao[0];
+        const numeroNota = nota.NfeCabecario[0].numeroNota[0];
+        const prestador = nota.DadosPrestador[0].razaoSocial[0];
+        const tomador = nota.TomadorServico[0].razaoSocial[0];
+        const valorServico = nota.DetalhesServico[0].valorServico[0];
+        const aliquota = nota.DetalhesServico[0].aliquota[0];
+        const baseCalculo = nota.Totais[0].baseCalculo[0];
+        const valorIss = nota.Totais[0].valorIss[0];
+        const valorLiquidoNota = nota.Totais[0].valorLiquidoNota[0];
+        const descricao = nota?.DetalhesServico[0]?.descricao
+          ? nota?.DetalhesServico[0]?.descricao[0]
+          : 'nao encontrado';
+
+        parsed = {
+          dataEmissao,
+          numeroNota,
+          prestador,
+          tomador,
+          valorServico,
+          aliquota,
+          baseCalculo,
+          valorIss,
+          valorLiquidoNota,
+          descricao: descricao
+            .replace(/,|;/g, '')
+            .split('\n')
+            .join(' ')
+            .split('\r')
+            .join(' '),
+        };
+
+        //console.log(parsed);
+        array.push(parsed);
+      });
+    } else {
+      console.log('Bad file: ', filename);
+      fs.renameSync(
+        `${__dirname}/xml/${filename}`,
+        `${__dirname}/badfiles/${filename}`,
+      );
+    }
   });
-
-  return parsed;
+  return array;
 }
 
 function main() {
@@ -47,7 +68,9 @@ function main() {
   files.forEach((file) => {
     const data = parseXml(file);
 
-    array.push(data);
+    data.forEach((item) => {
+      array.push(item);
+    });
   });
 
   writeCsv(array);
